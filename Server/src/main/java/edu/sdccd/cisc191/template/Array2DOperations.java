@@ -14,6 +14,14 @@ public class Array2DOperations {
             }
         }
     }
+
+    /**
+     * Returns the value at row and col of array2D
+     * @param row an int of the row looked up
+     * @param col and int of the column looked up
+     * @return the value in the cell
+     * @throws IndexOutOfBoundsException
+     */
     public int getAtIndex(int row, int col) throws IndexOutOfBoundsException {
             return array2D[row][col];
     }
