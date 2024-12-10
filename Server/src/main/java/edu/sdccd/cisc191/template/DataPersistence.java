@@ -1,46 +1,36 @@
 package edu.sdccd.cisc191.template;
 
-import java.io.*;
+import edu.sdccd.cisc191.template.Order;
+import edu.sdccd.cisc191.template.SerializationUtil;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.FileReader;
+import java.util.List;
+import java.util.ArrayList;
 
-public class DataPersistence {
-    private static final String ARRAY_FILE = "array.dat";
-    private static final String ARRAY2D_FILE = "array2D.dat";
+public class DataPersistence
+{
+    private static final String ORDERS_FILE = "orders.json";
 
-    public void saveArray(int[] array) {
-        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(ARRAY_FILE))) {
-            oos.writeObject(array);
-        } catch (IOException e) {
-            e.printStackTrace();
+    public static void saveOrders(List<Order> orders) throws Exception
+    {
+        String json = SerializationUtil.serialize(orders);
+        try (FileWriter writer = new FileWriter(new File(ORDERS_FILE)))
+        {
+            writer.write(json);
         }
     }
 
-    public int[] loadArray() {
-        File file = new File(ARRAY_FILE);
-        if (!file.exists()) return null;
-        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(ARRAY_FILE))) {
-            return (int[]) ois.readObject();
-        } catch (IOException | ClassNotFoundException e) {
-            e.printStackTrace();
-            return null;
+    public static List<Order> loadOrders() throws Exception
+    {
+        File file = new File(ORDERS_FILE);
+        if (!file.exists())
+        {
+            return new ArrayList<>();
         }
-    }
-
-    public void saveArray2D(int[][] array2D) {
-        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(ARRAY2D_FILE))) {
-            oos.writeObject(array2D);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public int[][] loadArray2D() {
-        File file = new File(ARRAY2D_FILE);
-        if (!file.exists()) return null;
-        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(ARRAY2D_FILE))) {
-            return (int[][]) ois.readObject();
-        } catch (IOException | ClassNotFoundException e) {
-            e.printStackTrace();
-            return null;
+        try (FileReader reader = new FileReader(file))
+        {
+            return SerializationUtil.deserialize(reader.toString(), List.class);
         }
     }
 }

@@ -1,106 +1,93 @@
 package edu.sdccd.cisc191.template;
 
-import java.io.*;
+import edu.sdccd.cisc191.template.Request;
+import edu.sdccd.cisc191.template.Response;
+import edu.sdccd.cisc191.template.OrderService;
+import edu.sdccd.cisc191.template.MenuService;
+import edu.sdccd.cisc191.template.TableService;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class Server {
-    private ArrayOperations arrayOps;
-    private Array2DOperations array2DOps;
-    private static final int PORT = 8080;
-    private ExecutorService executor;
+public class Server
+{
+    private static final int PORT = 12345;
+    private boolean running = true;
+    private ExecutorService executor = Executors.newFixedThreadPool(10);
 
-    public static void main(String[] args) {
-        Server server = new Server();
-        server.startServer();
+    private MenuService menuService = new MenuService();
+    private OrderService orderService = new OrderService();
+    private TableService tableService = new TableService();
+
+    public static void main(String[] args)
+    {
+        System.out.println("Server is running");
+        new Server().start();
     }
 
-    public Server() {
-        arrayOps = new ArrayOperations(10);
-        array2DOps = new Array2DOperations(5, 5);
-        executor = Executors.newFixedThreadPool(10);
-        loadData();
-    }
-
-    public void startServer() {
-        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
-            System.out.println("Server started. Listening on port " + PORT + "...");
-            while (true) {
+    public void start()
+    {
+        try (ServerSocket serverSocket = new ServerSocket(PORT))
+        {
+            System.out.println("Server started and listening on port " + PORT);
+            while (running)
+            {
                 Socket clientSocket = serverSocket.accept();
-                System.out.println("Client connected: " + clientSocket.getInetAddress());
-                executor.execute(new ClientHandler(clientSocket, arrayOps));
+                executor.submit(() -> handleClient(clientSocket));
             }
-        } catch (IOException e) {
+            executor.shutdown();
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private void loadData() {
-        DataPersistence dataPersistence = new DataPersistence();
-        int[] loadedArray = dataPersistence.loadArray();
-        if (loadedArray != null) {
-            arrayOps.setArray(loadedArray);
-            System.out.println("Loaded array data.");
-        }
-        int[][] loadedArray2D = dataPersistence.loadArray2D();
-        if (loadedArray2D != null) {
-            array2DOps.setArray2D(loadedArray2D);
-            System.out.println("Loaded 2D array data.");
+    private void handleClient(Socket clientSocket)
+    {
+        try (
+                ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream());
+                ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
+        )
+        {
+            Request request = (Request) in.readObject();
+            Response response = processRequest(request);
+            out.writeObject(response);
+        } catch (Exception e)
+        {
+            e.printStackTrace();
         }
     }
 
-    private class ClientHandler implements Runnable {
-        private Socket socket;
-        private ArrayOperations arrayOps;
-
-        public ClientHandler(Socket socket, ArrayOperations arrayOps) {
-            this.socket = socket;
-            this.arrayOps = arrayOps;
-        }
-
-        @Override
-        public void run() {
-            try (
-                    ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-                    ObjectInputStream in = new ObjectInputStream(socket.getInputStream())
-            ) {
-                Request request;
-                while ((request = (Request) in.readObject()) != null) {
-                    System.out.println("Received request: " + request.getOperation());
-                    Response response = processRequest(request);
-                    out.writeObject(response);
-                    out.flush();
-                }
-            } catch (IOException | ClassNotFoundException e) {
-                System.out.println("Client disconnected.");
-            }
-        }
-
-        private Response processRequest(Request request) {
-            String operation = request.getOperation();
-            int index = request.getIndex();
-            int value = request.getValue();
-
-            switch (operation.toUpperCase()) {
-                case "GET":
-                    try {
-                        int result = arrayOps.getAtIndex(index);
-                        return new Response(String.valueOf(result));
-                    } catch (IndexOutOfBoundsException e) {
-                        return new Response("Error: Invalid index.");
-                    }
-                case "SET":
-                    try {
-                        arrayOps.setAtIndex(index, value);
-                        return new Response("Value set successfully.");
-                    } catch (IndexOutOfBoundsException e) {
-                        return new Response("Error: Invalid index.");
-                    }
+    private Response processRequest(Request request) {
+        Response response = new Response();
+        try
+        {
+            switch (request.getAction())
+            {
+                case "GET_MENU":
+                    response.setPayload(menuService.getMenu());
+                    response.setStatus("SUCCESS");
+                    break;
+                case "ADD_ORDER":
+                    orderService.addOrder((edu.sdccd.cisc191.template.Order) request.getPayload());
+                    response.setStatus("SUCCESS");
+                    break;
+                case "GET_TABLES":
+                    response.setPayload(tableService.getTables());
+                    response.setStatus("SUCCESS");
+                    break;
+                // Add more cases as needed
                 default:
-                    return new Response("Error: Unknown operation.");
+                    response.setStatus("ERROR");
+                    response.setMessage("Unknown action: " + request.getAction());
             }
+        } catch (Exception e)
+        {
+            response.setStatus("ERROR");
+            response.setMessage(e.getMessage());
         }
+        return response;
     }
 }
